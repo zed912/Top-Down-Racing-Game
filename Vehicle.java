@@ -1,0 +1,183 @@
+/**
+ * Vehicle logic only: no keyboard, JavaFX, track, or lap counting.
+ * Coordinates describe the centre; +x is right and +y is down.
+ * Heading: 0 degrees = right, 90 = down. Time is measured in seconds.
+ */
+public abstract class Vehicle {
+    private final String name;
+    private final double maxSpeed;
+    private final double acceleration;
+    private final double handling;
+    private final double brakingPower;
+    private final double width;
+    private final double height;
+
+    private double x;
+    private double y;
+    private double speed;
+    private double headingDegrees;
+    private double speedMultiplier = 1.0;
+    private boolean steeringEnabled = true;
+
+    protected Vehicle(String name, double maxSpeed, double acceleration,
+                      double handling, double brakingPower,
+                      double width, double height) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("A vehicle needs a name.");
+        }
+        requirePositive(maxSpeed, "maxSpeed");
+        requirePositive(acceleration, "acceleration");
+        requirePositive(brakingPower, "brakingPower");
+        requirePositive(width, "width");
+        requirePositive(height, "height");
+        requirePositive(handling, "handling");
+        if (handling > 10) {
+            throw new IllegalArgumentException("handling must be at most 10.");
+        }
+        this.name = name;
+        this.maxSpeed = maxSpeed;
+        this.acceleration = acceleration;
+        this.handling = handling;
+        this.brakingPower = brakingPower;
+        this.width = width;
+        this.height = height;
+    }
+
+    /**
+     * Called by the game loop only while the race is running.
+     * throttle/braking: 0..1; steering: -1 (left)..1 (right).
+     * Braking takes priority over throttle. No input means coasting.
+     * This version brakes to a stop; it does not reverse.
+     */
+    public final void update(double deltaSeconds, double throttle,
+                             double braking, double steering) {
+        requireFinite(deltaSeconds, "deltaSeconds");
+        if (deltaSeconds < 0) {
+            throw new IllegalArgumentException("Time cannot be negative.");
+        }
+        requireRange(throttle, 0, 1, "throttle");
+        requireRange(braking, 0, 1, "braking");
+        requireRange(steering, -1, 1, "steering");
+
+        // Small steps keep acceleration and curved movement consistent
+        // when frames have different durations.
+        double remaining = deltaSeconds;
+        while (remaining > 0) {
+            double step = Math.min(remaining, 1.0 / 120.0);
+            moveStep(step, throttle, braking, steering);
+            remaining = Math.max(0, remaining - step);
+        }
+    }
+
+    private void moveStep(double dt, double throttle, double braking,
+                          double steering) {
+        double oldSpeed = speed;
+        if (braking > 0) {
+            speed = Math.max(0, speed - brakingPower * braking * dt);
+        } else {
+            speed = Math.min(getEffectiveMaxSpeed(),
+                    speed + acceleration * throttle * dt);
+        }
+
+        double averageSpeed = (oldSpeed + speed) / 2.0;
+        // Handling 10 gives 180 degrees/second at normal driving speed.
+        // Steering fades near a standstill, so the car cannot spin in place.
+        double lowSpeedFactor = Math.min(1, averageSpeed / (maxSpeed * 0.25));
+        double turn = steeringEnabled
+                ? steering * handling * 18.0 * lowSpeedFactor * dt : 0;
+        double middleHeading = Math.toRadians(headingDegrees + turn / 2.0);
+        x += Math.cos(middleHeading) * averageSpeed * dt;
+        y += Math.sin(middleHeading) * averageSpeed * dt;
+        headingDegrees = normalizeAngle(headingDegrees + turn);
+    }
+
+    /** Each type chooses how much speed it loses on one collision. */
+    public abstract void onCollision();
+
+    /** Used by subclasses or track effects; factor 0 stops, 1 keeps speed. */
+    public final void reduceSpeed(double factor) {
+        requireRange(factor, 0, 1, "factor");
+        speed *= factor;
+    }
+
+    /**
+     * External effect manager owns the timer and combined multiplier.
+     * 1.25 increases current speed and its limit by 25%; 1 restores normal.
+     * Setting the same multiplier repeatedly does not stack the boost.
+     */
+    public final void setSpeedMultiplier(double multiplier) {
+        requirePositive(multiplier, "multiplier");
+        requireFinite(maxSpeed * multiplier, "effectiveMaxSpeed");
+        double previousMultiplier = speedMultiplier;
+        speedMultiplier = multiplier;
+        if (multiplier > previousMultiplier) {
+            speed *= multiplier / previousMultiplier;
+        }
+        speed = Math.min(speed, getEffectiveMaxSpeed());
+    }
+
+    /** Oil manager disables steering, then restores it when its timer ends. */
+    public final void setSteeringEnabled(boolean enabled) {
+        steeringEnabled = enabled;
+    }
+
+    public final void stop() {
+        speed = 0;
+    }
+
+    /** Track/race code owns bounds and starting positions. */
+    public final void setPosition(double x, double y) {
+        requireFinite(x, "x");
+        requireFinite(y, "y");
+        this.x = x;
+        this.y = y;
+    }
+
+    public final void reset(double startX, double startY, double startHeadingDegrees) {
+        requireFinite(startHeadingDegrees, "startHeadingDegrees");
+        setPosition(startX, startY);
+        headingDegrees = normalizeAngle(startHeadingDegrees);
+        speed = 0;
+        speedMultiplier = 1;
+        steeringEnabled = true;
+    }
+
+    private static double normalizeAngle(double degrees) {
+        return ((degrees % 360) + 360) % 360;
+    }
+
+    private static void requireFinite(double value, String name) {
+        if (!Double.isFinite(value)) {
+            throw new IllegalArgumentException(name + " must be finite.");
+        }
+    }
+
+    private static void requirePositive(double value, String name) {
+        requireFinite(value, name);
+        if (value <= 0) {
+            throw new IllegalArgumentException(name + " must be positive.");
+        }
+    }
+
+    private static void requireRange(double value, double min, double max, String name) {
+        requireFinite(value, name);
+        if (value < min || value > max) {
+            throw new IllegalArgumentException(name + " must be between " + min + " and " + max);
+        }
+    }
+
+    public final String getName() { return name; }
+    public final double getMaxSpeed() { return maxSpeed; }
+    public final double getAcceleration() { return acceleration; }
+    public final double getHandling() { return handling; }
+    public final double getBrakingPower() { return brakingPower; }
+    public final double getWidth() { return width; }
+    public final double getHeight() { return height; }
+    public final double getX() { return x; }
+    public final double getY() { return y; }
+    public final double getSpeed() { return speed; }
+    public final double getHeadingDegrees() { return headingDegrees; }
+    public final double getSpeedMultiplier() { return speedMultiplier; }
+    public final double getEffectiveMaxSpeed() { return maxSpeed * speedMultiplier; }
+    public final boolean isSteeringEnabled() { return steeringEnabled; }
+}
