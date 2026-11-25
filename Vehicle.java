@@ -104,7 +104,7 @@ public abstract class Vehicle {
         double averageSpeed = (oldSpeed + speed) / 2.0;
         // Handling 10 gives 180 degrees/second at normal driving speed.
         // Steering fades near a standstill, so the car cannot spin in place.
-        double lowSpeedFactor = Math.min(-1,Math.min(1, averageSpeed / (maxSpeed * 0.25)));
+        double lowSpeedFactor = Math.max(-1,Math.min(1, averageSpeed / (maxSpeed * 0.25)));
         double turn = canSteer()
                 ? steering * handling * 18.0 * lowSpeedFactor * dt : 0;
         double middleHeading = Math.toRadians(headingDegrees + turn / 2.0);
