@@ -4,6 +4,10 @@
  * Heading: 0 degrees = right, 90 = down. Time is measured in seconds.
  */
 public abstract class Vehicle {
+    /** Longest time step accepted by one update() call, in seconds. */
+    private static final double MAX_UPDATE_SECONDS = 0.05;
+    /** Coasting slows a vehicle at this fraction of its braking power. */
+    private static final double COASTING_FRICTION = 0.25;
     private final String name;
     private final double maxSpeed;
     private final double acceleration;
@@ -44,40 +48,43 @@ public abstract class Vehicle {
         this.height = height;
     }
 
-    /**
+      /**
      * Called by the game loop only while the race is running.
      * throttle/braking: 0..1; steering: -1 (left)..1 (right).
+     * Out-of-range inputs are clamped and NaN counts as 0, so a bad value
+     * from the input code never crashes the game loop.
      * Braking takes priority over throttle. No input means coasting.
      * This version brakes to a stop; it does not reverse.
+     * deltaSeconds is clamped to 0..MAX_UPDATE_SECONDS, so one long frame
+     * cannot teleport the vehicle through walls.
      */
     public final void update(double deltaSeconds, double throttle,
-                             double braking, double steering) {
-        requireFinite(deltaSeconds, "deltaSeconds");
-        if (deltaSeconds < 0) {
-            throw new IllegalArgumentException("Time cannot be negative.");
-        }
-        requireRange(throttle, 0, 1, "throttle");
-        requireRange(braking, 0, 1, "braking");
-        requireRange(steering, -1, 1, "steering");
+         double braking, double steering) {
+        double dt = clamp(deltaSeconds, 0, MAX_UPDATE_SECONDS);
+        double throttleInput = clamp(throttle, 0, 1);
+        double brakingInput = clamp(braking, 0, 1);
+        double steeringInput = clamp(steering, -1, 1);
 
         // Small steps keep acceleration and curved movement consistent
         // when frames have different durations.
-        double remaining = deltaSeconds;
+        double remaining = dt;
         while (remaining > 0) {
             double step = Math.min(remaining, 1.0 / 120.0);
-            moveStep(step, throttle, braking, steering);
+            moveStep(step, throttleInput, brakingInput, steeringInput);
             remaining = Math.max(0, remaining - step);
         }
     }
-
     private void moveStep(double dt, double throttle, double braking,
                           double steering) {
         double oldSpeed = speed;
         if (braking > 0) {
             speed = Math.max(0, speed - brakingPower * braking * dt);
-        } else {
+        }else if (throttle > 0) {
             speed = Math.min(getEffectiveMaxSpeed(),
                     speed + acceleration * throttle * dt);
+        } else {
+            // No input: friction slows the vehicle down gradually.
+            speed = Math.max(0, speed - brakingPower * COASTING_FRICTION * dt);
         }
 
         double averageSpeed = (oldSpeed + speed) / 2.0;
@@ -171,6 +178,13 @@ public abstract class Vehicle {
         if (value <= 0) {
             throw new IllegalArgumentException(name + " must be positive.");
         }
+    }
+    /** Keeps value inside min..max; NaN becomes 0. */
+    private static double clamp(double value, double min, double max) {
+        if (Double.isNaN(value)) {
+            return 0;
+        }
+        return Math.max(min, Math.min(max, value));
     }
 
     private static void requireRange(double value, double min, double max, String name) {

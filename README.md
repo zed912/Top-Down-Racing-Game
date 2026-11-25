@@ -28,6 +28,6 @@ car.update(0.016, 1, 0, 1); // Seconds, throttle, braking, steering
 - Throttle and braking: `0..1`. Steering: `-1` left, `0` straight, `1` right.
 - Position is the vehicle centre. X increases right; Y increases down.
 - Heading is in degrees: `0` right, `90` down. Handling controls turning speed.
-- Braking takes priority and stops at zero. No input keeps the current speed.
+- Braking takes priority and stops at zero. With no input, friction slowly reduces the speed.
 - BMW loses steering control for 0.5 s after a collision (`loseControl`).
-
+- Invalid inputs are clamped (and NaN becomes 0). One `update()` call handles at most 0.05 s.
