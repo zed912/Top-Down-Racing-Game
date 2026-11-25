@@ -4,6 +4,10 @@
  * Heading: 0 degrees = right, 90 = down. Time is measured in seconds.
  */
 public abstract class Vehicle {
+    /** Top reverse speed is this fraction of the (boosted) top speed. */
+    private static final double REVERSE_SPEED_FRACTION = 0.4;
+    /** Reversing accelerates at this fraction of normal acceleration. */
+    private static final double REVERSE_ACCEL_FRACTION = 0.5;
     /** Longest time step accepted by one update() call, in seconds. */
     private static final double MAX_UPDATE_SECONDS = 0.05;
     /** Coasting slows a vehicle at this fraction of its braking power. */
@@ -77,20 +81,30 @@ public abstract class Vehicle {
     private void moveStep(double dt, double throttle, double braking,
                           double steering) {
         double oldSpeed = speed;
-        if (braking > 0) {
-            speed = Math.max(0, speed - brakingPower * braking * dt);
-        }else if (throttle > 0) {
+                if (braking > 0) {
+            if (speed > 0) {
+                // Still rolling forward: brake down to a stop.
+                speed = Math.max(0, speed - brakingPower * braking * dt);
+            } else {
+                // Stopped or already backing up: reverse (negative speed).
+                speed = Math.max(-getMaxReverseSpeed(), speed
+                        - acceleration * REVERSE_ACCEL_FRACTION * braking * dt);
+            }
+        } else if (throttle > 0) {
+            // From a reverse speed this first brings the car back to zero.
             speed = Math.min(getEffectiveMaxSpeed(),
                     speed + acceleration * throttle * dt);
         } else {
-            // No input: friction slows the vehicle down gradually.
-            speed = Math.max(0, speed - brakingPower * COASTING_FRICTION * dt);
+            // No input: friction pulls the speed toward zero from either side.
+            double drop = brakingPower * COASTING_FRICTION * dt;
+            speed = speed > 0 ? Math.max(0, speed - drop)
+                              : Math.min(0, speed + drop);
         }
 
         double averageSpeed = (oldSpeed + speed) / 2.0;
         // Handling 10 gives 180 degrees/second at normal driving speed.
         // Steering fades near a standstill, so the car cannot spin in place.
-        double lowSpeedFactor = Math.min(1, averageSpeed / (maxSpeed * 0.25));
+        double lowSpeedFactor = Math.min(-1,Math.min(1, averageSpeed / (maxSpeed * 0.25)));
         double turn = canSteer()
                 ? steering * handling * 18.0 * lowSpeedFactor * dt : 0;
         double middleHeading = Math.toRadians(headingDegrees + turn / 2.0);
@@ -123,7 +137,7 @@ public abstract class Vehicle {
         if (multiplier > previousMultiplier) {
             speed *= multiplier / previousMultiplier;
         }
-        speed = Math.min(speed, getEffectiveMaxSpeed());
+            speed = Math.max(-getMaxReverseSpeed(),Math.min(speed, getEffectiveMaxSpeed()));
     }
 
     /** Oil manager disables steering, then restores it when its timer ends. */
@@ -206,6 +220,8 @@ public abstract class Vehicle {
     public final double getSpeed() { return speed; }
     public final double getHeadingDegrees() { return headingDegrees; }
     public final double getSpeedMultiplier() { return speedMultiplier; }
+    public final double getMaxReverseSpeed() { return getEffectiveMaxSpeed() * REVERSE_SPEED_FRACTION; }
+    public final boolean isReversing() { return speed < 0; }
     public final double getEffectiveMaxSpeed() { return maxSpeed * speedMultiplier; }
     public final boolean isSteeringEnabled() { return steeringEnabled; }
     public final double getControlLossSeconds() { return controlLossSeconds; }
