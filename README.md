@@ -13,9 +13,9 @@ Speed is in px/s, acceleration and braking in px/s², and dimensions in pixels.
 
 | Vehicle | Max Speed | Acceleration | Handling | Braking | Collision Speed Loss | Size |
 |---|---:|---:|---:|---:|---:|---|
-| BMW | 260 | 100 | 9 | 130 | 40% | 48 × 26 |
-| Motorcycle | 230 | 140 | 7 | 115 | 60% | 38 × 16 |
-| Truck | 120 | 70 | 5 | 60 | 15% | 48 × 48 |
+| BMW | 260 | 160 | 6 | 130 | 40% | 48 × 26 |
+| Motorcycle | 200 | 110 | 9 | 115 | 60% | 38 × 16 |
+| Truck | 120 | 50 | 4 | 60 | 15% | 48 × 48 |
 
 ## Usage
 
@@ -29,5 +29,5 @@ car.update(0.016, 1, 0, 1); // Seconds, throttle, braking, steering
 - Position is the vehicle centre. X increases right; Y increases down.
 - Heading is in degrees: `0` right, `90` down. Handling controls turning speed.
 - Braking takes priority and stops at zero. No input keeps the current speed.
-
+- BMW loses steering control for 0.5 s after a collision (`loseControl`).
 

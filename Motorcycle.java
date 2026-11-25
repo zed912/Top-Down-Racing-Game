@@ -1,6 +1,6 @@
 public class Motorcycle extends Vehicle {
     public Motorcycle() {
-        super("Motorcycle", 230, 140, 7, 115, 38, 16);
+        super("Motorcycle", 200, 110, 9, 115, 38, 16);
     }
 
     @Override

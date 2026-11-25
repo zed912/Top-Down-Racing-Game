@@ -1,6 +1,6 @@
 public class Truck extends Vehicle {
     public Truck() {
-        super("Truck", 120, 70, 5, 60, 48, 48);
+        super("Truck", 120, 50, 4, 60, 48, 48);
     }
 
     @Override

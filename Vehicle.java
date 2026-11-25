@@ -18,6 +18,7 @@ public abstract class Vehicle {
     private double headingDegrees;
     private double speedMultiplier = 1.0;
     private boolean steeringEnabled = true;
+    private double controlLossSeconds = 0 ;
 
     protected Vehicle(String name, double maxSpeed, double acceleration,
                       double handling, double brakingPower,
@@ -83,12 +84,14 @@ public abstract class Vehicle {
         // Handling 10 gives 180 degrees/second at normal driving speed.
         // Steering fades near a standstill, so the car cannot spin in place.
         double lowSpeedFactor = Math.min(1, averageSpeed / (maxSpeed * 0.25));
-        double turn = steeringEnabled
+        double turn = canSteer()
                 ? steering * handling * 18.0 * lowSpeedFactor * dt : 0;
         double middleHeading = Math.toRadians(headingDegrees + turn / 2.0);
         x += Math.cos(middleHeading) * averageSpeed * dt;
         y += Math.sin(middleHeading) * averageSpeed * dt;
         headingDegrees = normalizeAngle(headingDegrees + turn);
+        
+        controlLossSeconds = Math.max(0, controlLossSeconds - dt);
     }
 
     /** Each type chooses how much speed it loses on one collision. */
@@ -121,6 +124,16 @@ public abstract class Vehicle {
         steeringEnabled = enabled;
     }
 
+        /**
+     * Steering is ignored for this many seconds; the vehicle keeps sliding
+     * along its current heading. A longer loss replaces a shorter one, and
+     * repeated calls do not add up.
+     */
+    public final void loseControl(double seconds) {
+        requirePositive(seconds, "seconds");
+        controlLossSeconds = Math.max(controlLossSeconds, seconds);
+    }
+
     public final void stop() {
         speed = 0;
     }
@@ -140,6 +153,7 @@ public abstract class Vehicle {
         speed = 0;
         speedMultiplier = 1;
         steeringEnabled = true;
+        controlLossSeconds = 0;
     }
 
     private static double normalizeAngle(double degrees) {
@@ -180,4 +194,6 @@ public abstract class Vehicle {
     public final double getSpeedMultiplier() { return speedMultiplier; }
     public final double getEffectiveMaxSpeed() { return maxSpeed * speedMultiplier; }
     public final boolean isSteeringEnabled() { return steeringEnabled; }
+    public final double getControlLossSeconds() { return controlLossSeconds; }
+    public final boolean canSteer() { return steeringEnabled && controlLossSeconds <= 0; }
 }
