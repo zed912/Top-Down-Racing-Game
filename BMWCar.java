@@ -9,4 +9,9 @@ public class BMWCar extends Vehicle {
         reduceSpeed(0.60);  // Lose 40% of current speed.
         loseControl(0.5);   // Cannot steer for half a second.
     }
+
+    @Override
+    public String getSpecialBehavior() {
+         return "Loses 40% speed and steering for 0.5s on collision";
+}
 }

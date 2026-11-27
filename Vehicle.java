@@ -28,9 +28,7 @@ public abstract class Vehicle {
     private boolean steeringEnabled = true;
     private double controlLossSeconds = 0 ;
 
-    protected Vehicle(String name, double maxSpeed, double acceleration,
-                      double handling, double brakingPower,
-                      double width, double height) {
+    protected Vehicle(String name, double maxSpeed, double acceleration,double handling, double brakingPower,double width, double height) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("A vehicle needs a name.");
         }
@@ -58,7 +56,7 @@ public abstract class Vehicle {
      * Out-of-range inputs are clamped and NaN counts as 0, so a bad value
      * from the input code never crashes the game loop.
      * Braking takes priority over throttle. No input means coasting.
-     * This version brakes to a stop; it does not reverse.
+     * This version brakes to a stop & reverse.
      * deltaSeconds is clamped to 0..MAX_UPDATE_SECONDS, so one long frame
      * cannot teleport the vehicle through walls.
      */
@@ -78,8 +76,7 @@ public abstract class Vehicle {
             remaining = Math.max(0, remaining - step);
         }
     }
-    private void moveStep(double dt, double throttle, double braking,
-                          double steering) {
+    private void moveStep(double dt, double throttle, double braking, double steering) {
         double oldSpeed = speed;
                 if (braking > 0) {
             if (speed > 0) {
@@ -87,18 +84,15 @@ public abstract class Vehicle {
                 speed = Math.max(0, speed - brakingPower * braking * dt);
             } else {
                 // Stopped or already backing up: reverse (negative speed).
-                speed = Math.max(-getMaxReverseSpeed(), speed
-                        - acceleration * REVERSE_ACCEL_FRACTION * braking * dt);
+                speed = Math.max(-getMaxReverseSpeed(), speed - acceleration * REVERSE_ACCEL_FRACTION * braking * dt);
             }
         } else if (throttle > 0) {
             // From a reverse speed this first brings the car back to zero.
-            speed = Math.min(getEffectiveMaxSpeed(),
-                    speed + acceleration * throttle * dt);
+            speed = Math.min(getEffectiveMaxSpeed(),speed + acceleration * throttle * dt);
         } else {
             // No input: friction pulls the speed toward zero from either side.
             double drop = brakingPower * COASTING_FRICTION * dt;
-            speed = speed > 0 ? Math.max(0, speed - drop)
-                              : Math.min(0, speed + drop);
+            speed = speed > 0 ? Math.max(0, speed - drop): Math.min(0, speed + drop);
         }
 
         double averageSpeed = (oldSpeed + speed) / 2.0;
@@ -118,6 +112,9 @@ public abstract class Vehicle {
     /** Each type chooses how much speed it loses on one collision. */
     public abstract void onCollision();
 
+    /** Returns a short description of this vehicle's special collision behaviour. */
+    public abstract String getSpecialBehavior();
+
     /** Used by subclasses or track effects; factor 0 stops, 1 keeps speed. */
     public final void reduceSpeed(double factor) {
         requireRange(factor, 0, 1, "factor");
@@ -134,7 +131,7 @@ public abstract class Vehicle {
         requireFinite(maxSpeed * multiplier, "effectiveMaxSpeed");
         double previousMultiplier = speedMultiplier;
         speedMultiplier = multiplier;
-        if (multiplier > previousMultiplier) {
+        if (multiplier > previousMultiplier && multiplier >1 ) {
             speed *= multiplier / previousMultiplier;
         }
             speed = Math.max(-getMaxReverseSpeed(),Math.min(speed, getEffectiveMaxSpeed()));

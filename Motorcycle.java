@@ -7,4 +7,9 @@ public class Motorcycle extends Vehicle {
     public void onCollision() {
         reduceSpeed(0.40); // Lose 60% of current speed.
     }
+
+    @Override
+    public String getSpecialBehavior() {
+        return "Loses 60% speed on collision";
+}
 }
